@@ -6,14 +6,21 @@ interface DocumentFormData {
   bulan: string;
   tahun: string;
   nomorSPP: string;
-  po: string;
-  pr: string;
+  tanggalSPP: string;
+  uraianSPP: string;
+  pembayaranKe: string;
+  po: string[];
+  pr: string[];
   tujuanPembayaran: string;
-  kategori: string;
-  jenisDokumen: 'Investasi' | 'Eksploitasi';
+  kategori: 'Investasi On Farm' | 'Investasi Off Farm' | 'Eksploitasi' | '';
+  jenisDokumen: string;
   subJenisDokumen: string;
   nilaiRupiah: string;
 }
+
+type FormErrors = {
+  [K in keyof DocumentFormData]?: string;
+};
 
 interface DocumentFormProps {
   onSubmit: (data: DocumentFormData) => void;
@@ -26,14 +33,87 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ onSubmit, loading = false }
     bulan: '',
     tahun: '',
     nomorSPP: '',
-    po: '',
-    pr: '',
+    tanggalSPP: '',
+    uraianSPP: '',
+    pembayaranKe: '',
+    po: [''],
+    pr: [''],
     tujuanPembayaran: '',
     kategori: '',
-    jenisDokumen: 'Investasi',
+    jenisDokumen: '',
     subJenisDokumen: '',
     nilaiRupiah: ''
   });
+
+  // Document type options based on category
+  const jenisDokumenOptions = {
+    'Eksploitasi': [
+      'Pemeliharaan Tanaman Menghasilkan',
+      'Pemupukan',
+      'Aplikasi Pemupukan',
+      'Panen & Pengumpulan',
+      'Pengangkutan',
+      'Pengolahan',
+      'Pembelian Bahan Bakar Minyak (BBM)',
+      'Biaya Pengiriman ke Pelabuhan',
+      'Biaya Sewa Gudang',
+      'Biaya Instalasi Pemompaan',
+      'Biaya Pelabuhan',
+      'Biaya Jasa KPBN',
+      'Biaya Pemasaran Lainnya',
+      'Biaya Pengangkutan, Perjalan & Penginapan',
+      'Biaya Pemeliharaan Bangunan, Mesin, Jalan dan Instalasi',
+      'Biaya Pemeliharaan Perlengkapan Kantor',
+      'Biaya Pajak dan Retribusi',
+      'Biaya Premi Asuransi',
+      'Biaya Keamanan',
+      'Biaya Mutu (ISO 9000)',
+      'Biaya Pengendalian Lingkungan (ISO 14000)',
+      'Biaya Sistem Manajemen Kesehatan & Keselamatan Kerja',
+      'Biaya Penelitian dan Percobaan',
+      'Biaya Sumbangan dan Iuran',
+      'Biaya CSR',
+      'Biaya Pendidikan dan Pengembangan SDM',
+      'Biaya Konsultan',
+      'Biaya Audit',
+      'Utilities (Air, Listrik, ATK, Brg Umum, Sewa Kantor)',
+      'Biaya Distrik',
+      'Biaya Institusi Terkait',
+      'Biaya Kantor Perwakilan',
+      'Biaya Komisaris',
+      'Biaya Media',
+      'Biaya Rapat',
+      'Biaya Telekomunikasi dan Ekspedisi',
+      'Lainnya',
+      'PPh Badan',
+      'PBB',
+      'PPH Masa',
+      'PPN',
+      'BPHTB',
+      'PPh Pasal 22, Pasal 23, Pasal 4 ayat (2) & PPh Pasal 15',
+      'Iuran BPJS B. Perusahaan',
+      'SHT (PPD/Cicilan)',
+      'Iuran Dapenbun (Normal)',
+      'Iuran Dapenbun (Tambahan)',
+      'Penghargaan Masa Kerja',
+      'PPh pasal 21'
+    ],
+    'Investasi On Farm': [
+      'Pekerjaan TU,TK,TB.',
+      'Pemel TBM Pupuk',
+      'Pemel TBM diluar Pupuk',
+      'Pembangunan bibitan'
+    ],
+    'Investasi Off Farm': [
+      'Pekerjaan Pembangunan Rumah',
+      'Pekerjaan Pembangunan Perusahaan',
+      'Pekerjaan Pembangunan Mesin dan Instalasi',
+      'Pekerjaan Pembangunan Jalan,jembatan dan Saluran Air',
+      'Pekerjaan Alat Angkutan',
+      'Pekerjaan Inventaris kecil',
+      'Pekerjaan Investasi Off Farm Lainnya'
+    ]
+  };
 
   // Auto-generate nomor dokumen saat component mount
   useEffect(() => {
@@ -44,14 +124,24 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ onSubmit, loading = false }
     }));
   }, []);
 
-  const [errors, setErrors] = useState<Partial<DocumentFormData>>({});
+  const [errors, setErrors] = useState<FormErrors>({});
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+
+    // Reset jenisDokumen when kategori changes
+    if (name === 'kategori') {
+      setFormData(prev => ({
+        ...prev,
+        kategori: value as DocumentFormData['kategori'],
+        jenisDokumen: ''
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      } as DocumentFormData));
+    }
 
     // Clear error when user starts typing
     if (errors[name as keyof DocumentFormData]) {
@@ -62,8 +152,31 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ onSubmit, loading = false }
     }
   };
 
+  const handleArrayInputChange = (index: number, field: 'po' | 'pr', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: prev[field].map((item, i) => i === index ? value : item)
+    }));
+  };
+
+  const addField = (field: 'po' | 'pr') => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: [...prev[field], '']
+    }));
+  };
+
+  const removeField = (field: 'po' | 'pr', index: number) => {
+    if (formData[field].length > 1) {
+      setFormData(prev => ({
+        ...prev,
+        [field]: prev[field].filter((_, i) => i !== index)
+      }));
+    }
+  };
+
   const validateForm = (): boolean => {
-    const newErrors: Partial<DocumentFormData> = {};
+    const newErrors: FormErrors = {};
 
     if (!formData.nomorDokumen.trim()) {
       newErrors.nomorDokumen = 'Nomor dokumen wajib diisi';
@@ -81,12 +194,16 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ onSubmit, loading = false }
       newErrors.nomorSPP = 'Nomor SPP wajib diisi';
     }
 
-    if (!formData.po.trim()) {
-      newErrors.po = 'Nomor PO wajib diisi';
+    if (!formData.tanggalSPP.trim()) {
+      newErrors.tanggalSPP = 'Tanggal SPP wajib diisi';
     }
 
-    if (!formData.pr.trim()) {
-      newErrors.pr = 'Nomor PR wajib diisi';
+    if (!formData.uraianSPP.trim()) {
+      newErrors.uraianSPP = 'Uraian SPP wajib diisi';
+    }
+
+    if (!formData.pembayaranKe.trim()) {
+      newErrors.pembayaranKe = 'Pembayaran ke wajib diisi';
     }
 
     if (!formData.tujuanPembayaran.trim()) {
@@ -95,6 +212,10 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ onSubmit, loading = false }
 
     if (!formData.kategori.trim()) {
       newErrors.kategori = 'Kategori wajib diisi';
+    }
+
+    if (!formData.jenisDokumen.trim()) {
+      newErrors.jenisDokumen = 'Jenis dokumen wajib diisi';
     }
 
     if (!formData.subJenisDokumen.trim()) {
@@ -203,53 +324,11 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ onSubmit, loading = false }
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-            {/* PO */}
-            <div>
-              <label htmlFor="po" className="block text-sm font-medium text-gray-700">
-                PO *
-              </label>
-              <input
-                type="text"
-                id="po"
-                name="po"
-                value={formData.po}
-                onChange={handleInputChange}
-                className={`mt-1 block w-full border ${
-                  errors.po ? 'border-red-500' : 'border-gray-300'
-                } rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
-                placeholder="Nomor PO"
-              />
-              {errors.po && (
-                <p className="mt-1 text-sm text-red-600">{errors.po}</p>
-              )}
-            </div>
-
-            {/* PR */}
-            <div>
-              <label htmlFor="pr" className="block text-sm font-medium text-gray-700">
-                PR *
-              </label>
-              <input
-                type="text"
-                id="pr"
-                name="pr"
-                value={formData.pr}
-                onChange={handleInputChange}
-                className={`mt-1 block w-full border ${
-                  errors.pr ? 'border-red-500' : 'border-gray-300'
-                } rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
-                placeholder="Nomor PR"
-              />
-              {errors.pr && (
-                <p className="mt-1 text-sm text-red-600">{errors.pr}</p>
-              )}
-            </div>
-
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {/* SPP */}
             <div>
               <label htmlFor="nomorSPP" className="block text-sm font-medium text-gray-700">
-                SPP *
+                Nomor SPP *
               </label>
               <input
                 type="text"
@@ -266,37 +345,56 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ onSubmit, loading = false }
                 <p className="mt-1 text-sm text-red-600">{errors.nomorSPP}</p>
               )}
             </div>
+
+            {/* Tanggal SPP */}
+            <div>
+              <label htmlFor="tanggalSPP" className="block text-sm font-medium text-gray-700">
+                Tanggal SPP *
+              </label>
+              <input
+                type="date"
+                id="tanggalSPP"
+                name="tanggalSPP"
+                value={formData.tanggalSPP}
+                onChange={handleInputChange}
+                className={`mt-1 block w-full border ${
+                  errors.tanggalSPP ? 'border-red-500' : 'border-gray-300'
+                } rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+              />
+              {errors.tanggalSPP && (
+                <p className="mt-1 text-sm text-red-600">{errors.tanggalSPP}</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            {/* Uraian SPP */}
+            <label htmlFor="uraianSPP" className="block text-sm font-medium text-gray-700">
+              Uraian SPP *
+            </label>
+            <textarea
+              id="uraianSPP"
+              name="uraianSPP"
+              rows={3}
+              value={formData.uraianSPP}
+              onChange={handleInputChange}
+              className={`mt-1 block w-full border ${
+                errors.uraianSPP ? 'border-red-500' : 'border-gray-300'
+              } rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+              placeholder="Uraian SPP"
+            />
+            {errors.uraianSPP && (
+              <p className="mt-1 text-sm text-red-600">{errors.uraianSPP}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {/* Tujuan Pembayaran */}
-            <div>
-              <label htmlFor="tujuanPembayaran" className="block text-sm font-medium text-gray-700">
-                Tujuan Pembayaran *
-              </label>
-              <input
-                type="text"
-                id="tujuanPembayaran"
-                name="tujuanPembayaran"
-                value={formData.tujuanPembayaran}
-                onChange={handleInputChange}
-                className={`mt-1 block w-full border ${
-                  errors.tujuanPembayaran ? 'border-red-500' : 'border-gray-300'
-                } rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
-                placeholder="Tujuan pembayaran"
-              />
-              {errors.tujuanPembayaran && (
-                <p className="mt-1 text-sm text-red-600">{errors.tujuanPembayaran}</p>
-              )}
-            </div>
-
             {/* Kategori */}
             <div>
               <label htmlFor="kategori" className="block text-sm font-medium text-gray-700">
                 Kategori *
               </label>
-              <input
-                type="text"
+              <select
                 id="kategori"
                 name="kategori"
                 value={formData.kategori}
@@ -304,15 +402,62 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ onSubmit, loading = false }
                 className={`mt-1 block w-full border ${
                   errors.kategori ? 'border-red-500' : 'border-gray-300'
                 } rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
-                placeholder="Kategori"
-              />
+              >
+                <option value="">Pilih Kategori</option>
+                <option value="Investasi On Farm">Investasi On Farm</option>
+                <option value="Investasi Off Farm">Investasi Off Farm</option>
+                <option value="Eksploitasi">Eksploitasi</option>
+              </select>
               {errors.kategori && (
                 <p className="mt-1 text-sm text-red-600">{errors.kategori}</p>
               )}
             </div>
+
+            {/* Pembayaran Ke */}
+            <div>
+              <label htmlFor="pembayaranKe" className="block text-sm font-medium text-gray-700">
+                Pembayaran Ke *
+              </label>
+              <input
+                type="number"
+                id="pembayaranKe"
+                name="pembayaranKe"
+                value={formData.pembayaranKe}
+                onChange={handleInputChange}
+                className={`mt-1 block w-full border ${
+                  errors.pembayaranKe ? 'border-red-500' : 'border-gray-300'
+                } rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                placeholder="1"
+                min="1"
+              />
+              {errors.pembayaranKe && (
+                <p className="mt-1 text-sm text-red-600">{errors.pembayaranKe}</p>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          <div>
+            {/* Tujuan Pembayaran */}
+            <label htmlFor="tujuanPembayaran" className="block text-sm font-medium text-gray-700">
+              Tujuan Pembayaran *
+            </label>
+            <input
+              type="text"
+              id="tujuanPembayaran"
+              name="tujuanPembayaran"
+              value={formData.tujuanPembayaran}
+              onChange={handleInputChange}
+              className={`mt-1 block w-full border ${
+                errors.tujuanPembayaran ? 'border-red-500' : 'border-gray-300'
+              } rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+              placeholder="Tujuan pembayaran"
+            />
+            {errors.tujuanPembayaran && (
+              <p className="mt-1 text-sm text-red-600">{errors.tujuanPembayaran}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {/* Jenis Dokumen */}
             <div>
               <label htmlFor="jenisDokumen" className="block text-sm font-medium text-gray-700">
@@ -323,47 +468,24 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ onSubmit, loading = false }
                 name="jenisDokumen"
                 value={formData.jenisDokumen}
                 onChange={handleInputChange}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              >
-                <option value="">Pilih Jenis</option>
-                <option value="Investasi">Investasi</option>
-                <option value="Eksploitasi">Eksploitasi</option>
-              </select>
-            </div>
-
-            {/* Sub Jenis Dokumen */}
-            <div>
-              <label htmlFor="subJenisDokumen" className="block text-sm font-medium text-gray-700">
-                Sub Jenis Dokumen *
-              </label>
-              <select
-                id="subJenisDokumen"
-                name="subJenisDokumen"
-                value={formData.subJenisDokumen}
-                onChange={handleInputChange}
+                disabled={!formData.kategori}
                 className={`mt-1 block w-full border ${
-                  errors.subJenisDokumen ? 'border-red-500' : 'border-gray-300'
-                } rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                  errors.jenisDokumen ? 'border-red-500' : 'border-gray-300'
+                } rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm ${
+                  !formData.kategori ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
               >
-                <option value="">Pilih Sub Jenis</option>
-                {formData.jenisDokumen === 'Investasi' ? (
-                  <>
-                    <option value="Investasi Barang">Investasi Barang</option>
-                    <option value="Investasi Jasa">Investasi Jasa</option>
-                    <option value="Investasi Tanah">Investasi Tanah</option>
-                    <option value="Investasi Gedung">Investasi Gedung</option>
-                  </>
-                ) : formData.jenisDokumen === 'Eksploitasi' ? (
-                  <>
-                    <option value="Operasional">Operasional</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="Raw Material">Raw Material</option>
-                    <option value="Marketing">Marketing</option>
-                  </>
-                ) : null}
+                <option value="">
+                  {!formData.kategori ? 'Pilih kategori terlebih dahulu' : 'Pilih Jenis Dokumen'}
+                </option>
+                {formData.kategori && jenisDokumenOptions[formData.kategori]?.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
               </select>
-              {errors.subJenisDokumen && (
-                <p className="mt-1 text-sm text-red-600">{errors.subJenisDokumen}</p>
+              {errors.jenisDokumen && (
+                <p className="mt-1 text-sm text-red-600">{errors.jenisDokumen}</p>
               )}
             </div>
 
@@ -389,24 +511,99 @@ const DocumentForm: React.FC<DocumentFormProps> = ({ onSubmit, loading = false }
             </div>
           </div>
 
+          {/* Dynamic PO Fields */}
+          <div className="border-t pt-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              PO (Opsional)
+            </label>
+            {formData.po.map((po, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={po}
+                  onChange={(e) => handleArrayInputChange(index, 'po', e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder={`Nomor PO ${index + 1}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => addField('po')}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  +
+                </button>
+                {formData.po.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeField('po', index)}
+                    className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    −
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Dynamic PR Fields */}
+          <div className="border-t pt-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              PR (Opsional)
+            </label>
+            {formData.pr.map((pr, index) => (
+              <div key={index} className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={pr}
+                  onChange={(e) => handleArrayInputChange(index, 'pr', e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder={`Nomor PR ${index + 1}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => addField('pr')}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  +
+                </button>
+                {formData.pr.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeField('pr', index)}
+                    className="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  >
+                    −
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
           {/* Submit Button */}
           <div className="flex justify-end space-x-3">
             <button
               type="button"
               className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              onClick={() => setFormData({
-                nomorDokumen: '0001',
-                bulan: '',
-                tahun: '',
-                nomorSPP: '',
-                po: '',
-                pr: '',
-                tujuanPembayaran: '',
-                kategori: '',
-                jenisDokumen: 'Investasi',
-                subJenisDokumen: '',
-                nilaiRupiah: ''
-              })}
+              onClick={() => {
+                const nextNumber = LocalStorageService.getNextDocumentNumber();
+                setFormData({
+                  nomorDokumen: nextNumber,
+                  bulan: '',
+                  tahun: '',
+                  nomorSPP: '',
+                  tanggalSPP: '',
+                  uraianSPP: '',
+                  pembayaranKe: '',
+                  po: [''],
+                  pr: [''],
+                  tujuanPembayaran: '',
+                  kategori: '',
+                  jenisDokumen: '',
+                  subJenisDokumen: '',
+                  nilaiRupiah: ''
+                });
+                setErrors({});
+              }}
             >
               Reset
             </button>
